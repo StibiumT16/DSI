@@ -26,7 +26,9 @@ class T5Trainer(Trainer):
 class EvalCallback(TrainerCallback):
     def __init__(self, 
                  test_dataset, 
-                 tokenizer, 
+                 docid_strategy,
+                 tokenizer,
+                 model_vocab_size, 
                  trie, 
                  max_length : int, 
                  num_beams : int, 
@@ -35,9 +37,11 @@ class EvalCallback(TrainerCallback):
         
         self.args = args
         self.trie = trie
+        self.tokenizer = tokenizer
         self.max_length = max_length
         self.num_beams = num_beams
-        self.tokenizer = tokenizer
+        self.bias = model_vocab_size
+        self.docid_strategy = docid_strategy
         self.dataloader = DataLoader(
             test_dataset,
             batch_size=self.args.per_device_eval_batch_size,
@@ -60,13 +64,26 @@ class EvalCallback(TrainerCallback):
     
     def docid2clusterid(self, docid):
         x_list = []
-        for x in docid:
-            if x == 1:
-                break
-            elif x != 0:
-                x_list.append(str(x))
-        res = self.tokenizer.decode(x_list).replace(' ', ',')
-        return res
+        if self.docid_strategy == 'expand_vocab':
+            for x in docid:
+                if x == 1:
+                    break
+                elif x >= self.bias:
+                    x_list.append(str(x - self.bias))
+        elif self.docid_strategy == 'tokenize':
+            for x in docid:
+                if x == 1:
+                    break
+                elif x != 0:
+                    x_list.append(x)
+            x_list = self.tokenizer.decode(x_list).split()
+        elif self.docid_strategy == 'token':
+            for x in docid:
+                if x != 0:
+                    x_list.append(str(x))
+                elif x == 1:
+                    break
+        return ",".join(x_list)
     
     def on_save(self, args, state, control, **kwargs): # DEBUG: on_epoch_begin
         if is_main_process(self.args.local_rank):

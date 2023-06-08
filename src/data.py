@@ -10,10 +10,14 @@ class Traindata(Dataset):
                  max_length,
                  max_docid_length, 
                  tokenizer, 
+                 model_vocab_size,
+                 docid_strategy,
         ):
         self.max_length = max_length
         self.max_docid_length = max_docid_length
         self.tokenizer = tokenizer
+        self.bias = model_vocab_size
+        self.docid_strategy = docid_strategy
         self.data = datasets.load_dataset(
             'json',
             data_files = filename,
@@ -35,13 +39,26 @@ class Traindata(Dataset):
             padding='max_length',
             max_length=self.max_length,
         )
-        
-        docid = self.tokenizer(clusterid.replace(',', ' '), 
+        if self.docid_strategy == "expand_vocab":
+            vals = [int(x) + self.bias for x in clusterid.split(",")]
+            vals.append(1)
+            docid = [0 for i in range(self.max_docid_length)]
+            docid[:len(vals)] = vals
+            docid = torch.tensor(docid)
+            
+        elif self.docid_strategy == "tokenize":
+            docid = self.tokenizer(clusterid.replace(',', ' '), 
                                 truncation=True,
                                 padding='max_length',
                                 max_length=self.max_docid_length,
                                 return_tensors="pt"
-        ).input_ids[0]
+            ).input_ids[0]
+            
+        elif self.docid_strategy == "token":
+            vals = [int(x) for x in clusterid.split(",")]
+            docid = [0 for i in range(self.max_docid_length)]
+            docid[:len(vals)] = vals
+            docid = torch.tensor(docid)
         
         return {
             "input_ids": input.input_ids[0],

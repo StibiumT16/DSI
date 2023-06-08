@@ -1,18 +1,19 @@
 data="nq320k"
 docid="bert_10_100"
+docid_strategy="expand_vocab" # expand_vocab / tokenize / token
 
 mkdir -p data/$data/run
-mkdir -p data/$data/run/model
 
 python -m torch.distributed.launch --nproc_per_node 2 --master_port=12345 src/run.py \
     --task train \
-    --kmeans_path data/$data/kmeans/$docid.tsv \
-    --train_path data/$data/train_data/train.json \
-    --valid_path data/$data/train_data/valid.json \
-    --output_dir data/$data/run/model \
+    --docid_path data/$data/kmeans/$docid.tsv \
+    --train_path data/$data/train_data/${docid}_train.json \
+    --valid_path data/$data/train_data/${docid}_valid.json \
+    --output_dir data/$data/run/${docid}_${docid_strategy} \
     --overwrite_output_dir True \
-    --logging_dir data/$data/run/log \
+    --logging_dir data/$data/run/${docid}_${docid_strategy}/log \
     --model_name_or_path t5-base \
+    --docid_strategy $docid_strategy \
     --max_steps  120000 \
     --max_length 128 \
     --per_device_train_batch_size 48 \
